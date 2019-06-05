@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+
+		<title>WtH?</title>
+
+		<meta name="What the Hell?" content="">
+		<meta name="Gerard Briscoe" content="">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+
+		<link href="http://fonts.googleapis.com/css?family=Raleway:400,300,600" rel="stylesheet" type="text/css">
+
+		<link rel="stylesheet" href="css/normalize.css">
+		<link rel="stylesheet" href="css/skeleton.css">
+
+		<link rel="shortcut icon" href="favico/favicon.ico" type="image/x-icon"/>
+
+		<link rel="apple-touch-icon" href="favico/apple-touch-icon.png"/>
+		<link rel="apple-touch-icon" sizes="57x57" href="favico/apple-touch-icon-57x57.png"/>
+		<link rel="apple-touch-icon" sizes="72x72" href="favico/apple-touch-icon-72x72.png"/>
+		<link rel="apple-touch-icon" sizes="76x76" href="favico/apple-touch-icon-76x76.png"/>
+		<link rel="apple-touch-icon" sizes="114x114" href="favico/apple-touch-icon-114x114.png"/>
+		<link rel="apple-touch-icon" sizes="120x120" href="favico/apple-touch-icon-120x120.png"/>
+		<link rel="apple-touch-icon" sizes="144x144" href="favico/apple-touch-icon-144x144.png"/>
+		<link rel="apple-touch-icon" sizes="152x152" href="favico/apple-touch-icon-152x152.png"/>
+		<link rel="apple-touch-icon" sizes="180x180" href="favico/apple-touch-icon-180x180.png"/>
+		<link rel="icon" type="image/png" sizes="16x16" href="favico/android-icon-16x16.png">
+		<link rel="icon" type="image/png" sizes="32x32" href="favico/android-icon-32x32.png">
+		<link rel="icon" type="image/png" sizes="36x36" href="favico/android-icon-36x36.png">
+		<link rel="icon" type="image/png" sizes="48x48" href="favico/android-icon-48x48.png">
+		<link rel="icon" type="image/png" sizes="72x72" href="favico/android-icon-72x72.png">
+		<link rel="icon" type="image/png" sizes="96x96" href="favico/android-icon-96x96.png">
+		<link rel="icon" type="image/png" sizes="144x144" href="favico/android-icon-144x144.png">
+		<link rel="icon" type="image/png" sizes="192x192" href="favico/android-icon-192x192.png">
+		<link rel="manifest" href="favico/manifest.json">
+		<meta name="msapplication-TileColor" content="#ffffff">
+		<meta name="msapplication-TileImage" content="favico/ms-icon-144x144.png">
+		<meta name="theme-color" content="#ffffff">
+
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script>
+
+		<script type="text/javascript" src="assets/scripts/jquery.min.js"></script>
+		<script type="text/javascript" src="assets/scripts/jquery-migrate.min.js"></script>
+		<script type="text/javascript" src="assets/scripts/jquery.history.js"></script>
+		<script type="text/javascript" src="assets/scripts/jquery.tooltip.min.js"></script>
+		<script type="text/javascript" src="assets/scripts/raphael-min.js"></script>
+		<script type="text/javascript" src="assets/scripts/Tween.js"></script>
+		<script type="text/javascript" src="assets/scripts/bubbletree.js"></script>
+		<link rel="stylesheet" type="text/css" href="assets/styles/bubbletree.css" />
+		<script type="text/javascript" src="assets/styles/cofog.js"></script>
+		<script type="text/javascript" src="https://raw.githubusercontent.com/douglascrockford/JSON-js/master/cycle.js"></script>
+
+		<script>
+			"use strict";
+
+			function sparql(query, callback, isReverse, fname)
+				{
+				var isDebug = false;
+				var endpoint = "http://dbpedia.org/sparql";
+				var querypart = "query=" + escape(query);
+				var xmlhttp = new XMLHttpRequest();
+
+				xmlhttp.open('POST', endpoint, true); // GET can have caching probs, so POST
+				xmlhttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+				xmlhttp.setRequestHeader("Accept", "application/sparql-results+json");
+				xmlhttp.onreadystatechange = function()
+					{
+					if(xmlhttp.readyState == 4)
+						{
+						if(xmlhttp.status == 200)
+							{
+							if(isDebug){alert(xmlhttp.responseText);}
+							callback(xmlhttp.responseText, isReverse, fname);
+							} 
+							else{if(isDebug){alert("Sparql query error: " + xmlhttp.status + " " + xmlhttp.responseText);}}
+						}
+					}
+				xmlhttp.send(querypart);
+				}
+
+			function sparqlQueryJson(fname, isReverse)
+				{
+				fname = unescape(fname);
+				document.getElementById("results").innerHTML = "";
+				document.getElementById("results").innerHTML = "<div class='progress'><div>Searching…</div></div>";
+				if(document.getElementById("fname").value != fname);
+					{document.getElementById("fname").value = fname;}
+				var queryStr;
+				fname = querify(fname, '.');
+				if(isReverse)
+					{
+					queryStr = "\
+SELECT DISTINCT ?company ?comWiki ?companyName ?subCompany ?subComWiki ?subComName \
+WHERE \
+	{ \
+	?company a <http://dbpedia.org/ontology/Company> . \
+	?company rdfs:label ?companyName . \
+    FILTER ((lang(?companyName) = 'en') && regex(?companyName, '" + fname + "', 'ig')) \
+	OPTIONAL{ \
+		{?subCompany <http://dbpedia.org/ontology/parentCompany> ?company . \
+			OPTIONAL {?subCompany <http://dbpedia.org/ontology/wikiPageID> ?subComWiki .} . OPTIONAL {?subCompany rdfs:label ?subComName}} \
+		UNION {?subCompany <http://dbpedia.org/property/parentCompany> ?company . \
+			OPTIONAL {?subCompany <http://dbpedia.org/ontology/wikiPageID> ?subComWiki .} . OPTIONAL {?subCompany rdfs:label ?subComName}} \
+		UNION {?subCompany <http://dbpedia.org/ontology/owningCompany> ?company . \
+			OPTIONAL {?subCompany <http://dbpedia.org/ontology/wikiPageID> ?subComWiki .} . OPTIONAL {?subCompany rdfs:label ?subComName}} \
+		UNION {?subCompany <http://dbpedia.org/property/owningCompany> ?company . \
+			OPTIONAL {?subCompany <http://dbpedia.org/ontology/wikiPageID> ?subComWiki .} . OPTIONAL {?subCompany rdfs:label ?subComName}} \
+		} \
+	FILTER (((lang(?subComName) = 'en') && !regex(?subComName, '" + fname + "', 'ig')) || (lang(?subComName) = '')) \
+	OPTIONAL{?company <http://dbpedia.org/ontology/wikiPageID> ?comWiki .} \
+	} \
+ORDER BY ASC(?company) ASC(?subCompany) \
+";
+					}
+					else{
+						queryStr = "\
+SELECT DISTINCT ?company ?comWiki ?companyName ?parCompany ?parComWiki ?parentCompanyName \
+WHERE \
+	{ \
+	?company a <http://dbpedia.org/ontology/Company> . \
+	?company rdfs:label ?companyName . \
+    FILTER ((lang(?companyName) = 'en') && regex(?companyName, '" + fname + "', 'ig')) \
+	OPTIONAL{ \
+		{?company <http://dbpedia.org/ontology/parentCompany> ?parCompany . OPTIONAL {?parCompany rdfs:label ?parentCompanyName .} \
+			OPTIONAL {?parCompany <http://dbpedia.org/ontology/wikiPageID> ?parComWiki .}} \
+		UNION {?company <http://dbpedia.org/property/parentCompany> ?parCompany . OPTIONAL {?parCompany rdfs:label ?parentCompanyName .} \
+			OPTIONAL {?parCompany <http://dbpedia.org/ontology/wikiPageID> ?parComWiki .}} \
+		UNION {?company <http://dbpedia.org/ontology/owningCompany> ?parCompany . OPTIONAL {?parCompany rdfs:label ?parentCompanyName .} \
+			OPTIONAL {?parCompany <http://dbpedia.org/ontology/wikiPageID> ?parComWiki .}} \
+		UNION {?company <http://dbpedia.org/property/owningCompany> ?parCompany . OPTIONAL {?parCompany rdfs:label ?parentCompanyName .} \
+			OPTIONAL {?parCompany <http://dbpedia.org/ontology/wikiPageID> ?parComWiki .}} \
+		} \
+	FILTER (((lang(?parentCompanyName) = 'en') && (!regex(?parentCompanyName, '" + fname + "', 'ig'))) || (lang(?parentCompanyName) = '')) \
+	OPTIONAL {?company <http://dbpedia.org/ontology/wikiPageID> ?comWiki .} \
+	} \
+ORDER BY ASC(?company) ASC(?parentCompanyName) \
+";
+						}
+
+				sparql(queryStr, myCallback, isReverse, fname);
+				}
+	
+			function myCallback(str, isReverse, fname)
+				{
+				var jsonObj = eval('(' + str + ')');
+				var result = "<table border='0' cellpadding='9'>" ;
+				if (jsonObj.results.bindings.length > 0)
+					{
+					for(var i = 0; i< jsonObj.results.bindings.length; i++)
+						{
+						result += "<tr><td><a href='http://en.wikipedia.org/wiki/?curid=" + jsonObj.results.bindings[i].comWiki.value + "'><h6>" + jsonObj.results.bindings[i].companyName.value;
+						var otherCompany, otherCompanyName;
+						if(isReverse)
+							{
+							try{
+								otherCompany = jsonObj.results.bindings[i].subComWiki.value;
+								otherCompanyName = jsonObj.results.bindings[i].subComName.value;
+								result += "</h6></a></td><td><h6>owns</h6></td><td><a href='http://en.wikipedia.org/wiki/?curid=" + otherCompany + "'><h6>" + otherCompanyName +"</h6></a>" + "</td><td><h6><a href='#' onclick=\"sparqlQueryJson('" + escape(otherCompanyName) + "', true)\">Owns?</a></h6></td>";
+								}
+								catch(TypeError)
+									{
+									try{
+										otherCompanyName = jsonObj.results.bindings[i].subCompany.value;
+										otherCompanyName = otherCompanyName.replace(/.*\//g, '');
+										getWikiURL(otherCompanyName, urlCallBack, "res" + i);
+										result += "</h6></a></td><td><h6>owns</h6></td><td><div id='res" + i + "'></div>";
+										}
+										catch(TypeError){result += "</h6></a></td><td><h6>no subsidiaries</h6></td>";}										
+									}
+							}
+							else{
+								try{
+									otherCompany = jsonObj.results.bindings[i].parComWiki.value;
+									otherCompanyName = jsonObj.results.bindings[i].parentCompanyName.value;
+									result += "</h6></a></td><td><h6>owner</h6></td><td><a href='http://en.wikipedia.org/wiki/?curid=" + otherCompany + "'><h6>" + otherCompanyName + "</h6></a>" + "</td><td><h6><a href='#' onclick='sparqlQueryJson(\"" + escape(jsonObj.results.bindings[i].parentCompanyName.value) + "\", false)'>Owner?</a></h6>";
+									}
+									catch(TypeError)
+										{
+										try{
+											otherCompanyName = jsonObj.results.bindings[i].parCompany.value;
+											getWikiURL(otherCompanyName, urlCallBack, "res" + i);
+											result += "</h6></a></td><td><h6>owner</h6></td><td><div id='res" + i + "'></div>";
+											}
+											catch(TypeError){result += "</h6></a></td><td><h6>not a subsidiary</h6></td>";}										
+										}
+								}
+						result += "</td></tr>"; 
+						}
+					result += "</table>" ;
+					document.getElementById("results").innerHTML = "";
+					document.getElementById("results").innerHTML = result;
+					}
+					else{
+						var strQuery = "\
+select ?company ?companyName ?comWiki \
+where \
+	{ \
+	?company a <http://dbpedia.org/ontology/Company> . \
+	?company rdfs:label ?companyName . \
+	FILTER (regex(?companyName, '" + fname + "', 'i') && (lang(?companyName) = 'en')) \
+	OPTIONAL {?company <http://dbpedia.org/ontology/wikiPageID> ?comWiki .} \
+	} \
+";
+						sparql(strQuery, otherCallback, isReverse, fname);
+						}
+				};
+
+			function urlCallBack(altURL, otherCompanyName, marker, hasURL)
+				{
+				var result;				
+				if(hasURL)
+					{
+					if(marker == "resZero")
+						{result = "<h6>try wikipedia: <a href='" + altURL + "'>"+ document.getElementById('fname').value + "</h6></a>";}
+						else{result = "<h6><a href='" + altURL + "'>"+ otherCompanyName + "</h6></a>";}
+					}
+					else{
+						if(marker == "resZero")
+							{result = "<h6> not found: "+ document.getElementById('fname').value + "</h6>";}
+							else{result = "<h6> " + document.getElementById('fname').value + "</h6>";}
+						}
+				document.getElementById(marker).innerHTML = result;
+				}
+
+			function getWikiURL(otherCompanyName, urlCallBack, marker)
+				{
+				var urlSearch = "http://en.wikipedia.org/w/api.php?action=query&list=search&format=json&callback=?&srsearch=" + querify(otherCompanyName, '.')
+				$.getJSON(urlSearch, function(result)
+					{
+					try{
+					var titleName = result.query.search[0].title;
+					titleName = titleName.replace(/\s+/g, '_');
+					urlCallBack("http://en.wikipedia.org/wiki/" + titleName, otherCompanyName, marker, true);
+					}catch(TypeError)
+									{
+									otherCompanyName = otherCompanyName.replace(/_/g, '');
+									urlCallBack(null, otherCompanyName, marker, false);
+									}
+					});
+				}
+
+			function querify(ocn, whiteSpace)
+				{
+				//remove url head
+				ocn = ocn.replace(/.*\//g, '');
+				//remove %
+				ocn = ocn.replace(/..\%/g, '');
+				//remove trailing white space
+				ocn = ocn.replace(/^\s+|\s+$/g, '');
+				//remove underscore
+				ocn = ocn.replace(/_/g, '');
+				//remove accents
+				ocn = deAccent(ocn);
+				//remove apostrophes
+				ocn = ocn.replace(/'/g, '.');
+				//remove trailing s
+				if (ocn.charAt(ocn.length - 1) == 's')
+					{ocn = ocn.substr(0, ocn.length - 1);}
+				//white to underscore, dot, paramater
+				ocn = ocn.replace(/\s+/g, whiteSpace);
+				return ocn;
+				}
+
+			function otherCallback(str, isReverse, fname)
+				{
+				var jsonObj = eval('(' + str + ')');
+				var result= "<table border='0' cellpadding='9'>";
+				if (jsonObj.results.bindings.length > 0)
+					{
+					for(var i = 0; i< jsonObj.results.bindings.length; i++)
+						{
+						result += "<tr><td><a href='http://en.wikipedia.org/wiki/?curid=" + jsonObj.results.bindings[i].comWiki.value + "'><h6>" + jsonObj.results.bindings[i].companyName.value;
+						if(isReverse){result += "</h6></a></td><td><h6>no subsidiaries</h6></td>";}
+							else{result += "</h6></a></td><td><h6>not a subsidiary</h6></td>";}
+						result += "</tr>"; 
+						}
+					}
+					else{
+						result += "<tr><td><div id='resZero'></div></td><tr>";
+						getWikiURL(fname, urlCallBack, "resZero");
+						}
+					result += "</table>" ;
+					document.getElementById("results").innerHTML = "";
+					document.getElementById("results").innerHTML = result;
+				};
+
+			function deAccent(s)
+				{
+				var r=s.toLowerCase();
+				r = r.replace(new RegExp(/[àáâãäåçèéêëìíîïñòóôõöùúûüýÿ]/g), ".");
+				r = r.replace(new RegExp(/æœ/g), "..");
+				return r;
+				};
+
+		</script>
+	</head>
+	<body>
+		<div class="container">
+			<div class="row">
+				<div class="one-half column" style="margin-top: 5%">
+					<h4>What the Hell?</h4>
+					<table width="100%" height="100%" border="0" cellspacing="0" cellpadding="0">
+						<tr>
+							<td>
+								<div align="left">
+									<p><b>Company Name:</b></p>
+									<p><input type="text" style="font-weight: bold;" autocomplete="off" autofocus id="fname" list="popular" onkeypress="if(event.keyCode==13){sparqlQueryJson(document.getElementById('fname').value, event.shiftKey);return false;}"></p> 
+									<p><input type="button" value="Owner?" onClick="sparqlQueryJson(document.getElementById('fname').value, false);"><input type="button" value="Owns?" onClick="sparqlQueryJson(document.getElementById('fname').value, true);"></p>
+								</div>
+							</td>
+						</tr>
+					</table>
+					<div id="results">
+						<table border='0' cellpadding='9'>
+							<tr><td><a href='http://en.wikipedia.org/wiki/?curid=171275'><h6>Ben & Jerry's</h6></a></td><td><h6>owner</h6></td><td><a href='http://en.wikipedia.org/wiki/?curid=240220'><h6>Unilever</h6></a></td></tr>
+							<tr><td><a href='http://en.wikipedia.org/wiki/?curid=2539174'><h6>Green & Black's</h6></a></td><td><h6>owner</h6></td><td><a href='http://en.wikipedia.org/wiki/?curid=37231747'><h6>Mondelēz International</h6></a></td></tr>
+							<tr><td><a href='http://en.wikipedia.org/wiki/?curid=3720331'><h6>Innocent Drinks</h6></a></td><td><h6>owner</h6></td><td><h6><a href='http://en.wikipedia.org/wiki/The_Coca-Cola_Company'>The Coca-Cola Company 90%</h6></a></td></tr>
+							<tr><td><a href='http://en.wikipedia.org/wiki/?curid=972447'><h6>The Body Shop</h6></a></td><td><h6>owner</h6></td><td><a href='http://en.wikipedia.org/wiki/?curid=728579'><h6>L'Oréal</h6></a></td></tr>
+						</table>
+					</div>
+					<div class="bubbletree-wrapper">
+						<div class="bubbletree"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
